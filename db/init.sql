@@ -1,3 +1,8 @@
+-- =============================================
+-- Script de inicialización de Base de Datos
+-- Autores: Joaquín Cáceres & Marcelo Apablaza
+-- Evaluación 2 - DevOps Duoc UC
+-- =============================================
 CREATE DATABASE IF NOT EXISTS tienda_perritos;
 USE tienda_perritos;
 
