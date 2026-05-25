@@ -1,5 +1,6 @@
 // Configuración del servidor Express para la Tienda de Perritos
 // Integración con AWS EC2 y despliegue mediante GitHub Actions
+// Cambio Backend
 const express = require("express");
 const cors = require("cors");
 const mysql = require("mysql2/promise");
