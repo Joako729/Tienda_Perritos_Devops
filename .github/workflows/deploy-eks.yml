@@ -2,7 +2,7 @@ name: CI/CD Tienda Perritos EKS
 
 on:
   push:
-    branches: [ "develop" ]
+    branches: [ "deploy" ]
 
 env:
   ECR_REGISTRY: 477810382052.dkr.ecr.us-east-1.amazonaws.com
