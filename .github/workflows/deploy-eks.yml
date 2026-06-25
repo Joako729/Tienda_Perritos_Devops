@@ -2,10 +2,10 @@ name: CI/CD Tienda Perritos EKS
 
 on:
   push:
-    branches: [ "develop" ] # Se activa automáticamente al hacer push a develop
+    branches: [ "deploy" ] 
 
 env:
-  ECR_REGISTRY: 477810382052.dkr.ecr.us-east-1.amazonaws.com # Tu ID de cuenta AWS
+  ECR_REGISTRY: 477810382052.dkr.ecr.us-east-1.amazonaws.com 
   CLUSTER_NAME: tienda-perritos-cluster
 
 jobs:
