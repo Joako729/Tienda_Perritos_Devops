@@ -2,7 +2,7 @@ name: CI/CD Tienda Perritos EKS
 
 on:
   push:
-    branches: [ "deploy" ] 
+    branches: [ "develop" ]
 
 env:
   ECR_REGISTRY: 477810382052.dkr.ecr.us-east-1.amazonaws.com
@@ -12,53 +12,36 @@ jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
     steps:
-    - name: Checkout codigo
-      uses: actions/checkout@v3
+      - name: Checkout codigo
+        uses: actions/checkout@v3
 
-    - name: Configurar credenciales AWS
-      uses: aws-actions/configure-aws-credentials@v4
-      with:
-        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
-        aws-region: ${{ secrets.AWS_REGION }}
+      - name: Configurar credenciales AWS
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ secrets.AWS_REGION }}
 
-    - name: Login en Amazon ECR
-      id: login-ecr
-      uses: aws-actions/amazon-ecr-login@v2
+      - name: Login en Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
 
-    # Construcción - Nota cómo unimos todo sin espacios en medio
-    - name: Build & Push Base de Datos
-      run: |
-        docker build -t ${{ env.ECR_REGISTRY }}/tienda-db:latest ./db
-        docker push ${{ env.ECR_REGISTRY }}/tienda-db:latest
+      - name: Build & Push Docker
+        run: |
+          docker build -t ${{ env.ECR_REGISTRY }}/tienda-db:latest ./db
+          docker push ${{ env.ECR_REGISTRY }}/tienda-db:latest
+          docker build -t ${{ env.ECR_REGISTRY }}/tienda-backend:latest ./backend
+          docker push ${{ env.ECR_REGISTRY }}/tienda-backend:latest
+          docker build -t ${{ env.ECR_REGISTRY }}/tienda-frontend:latest ./frontend
+          docker push ${{ env.ECR_REGISTRY }}/tienda-frontend:latest
 
-    - name: Build & Push Backend
-      run: |
-        docker build -t ${{ env.ECR_REGISTRY }}/tienda-backend:latest ./backend
-        docker push ${{ env.ECR_REGISTRY }}/tienda-backend:latest
-
-    - name: Build & Push Frontend
-      run: |
-        docker build -t ${{ env.ECR_REGISTRY }}/tienda-frontend:latest ./frontend
-        docker push ${{ env.ECR_REGISTRY }}/tienda-frontend:latest
-
-    # Despliegue
-    - name: Actualizar Kubeconfig
-      run: |
-        aws eks update-kubeconfig --region ${{ secrets.AWS_REGION }} --name ${{ env.CLUSTER_NAME }}
-
-    - name: Crear Namespace
-      run: |
-        kubectl create namespace tienda-perritos --dry-run=client -o yaml | kubectl apply -f -
-
-    - name: Inyectar Secrets
-      run: |
-        kubectl create secret generic tienda-secrets --namespace tienda-perritos --from-literal=db-root-password="admin123" --dry-run=client -o yaml | kubectl apply -f -
-
-    - name: Desplegar Manifiestos
-      run: |
-        kubectl apply -f k8s/db-deployment.yaml
-        kubectl apply -f k8s/backend-deployment.yaml
-        kubectl apply -f k8s/frontend-deployment.yaml
-        kubectl apply -f k8s/hpa.yaml
+      - name: Despliegue en EKS
+        run: |
+          aws eks update-kubeconfig --region ${{ secrets.AWS_REGION }} --name ${{ env.CLUSTER_NAME }}
+          kubectl create namespace tienda-perritos --dry-run=client -o yaml | kubectl apply -f -
+          kubectl create secret generic tienda-secrets --namespace tienda-perritos --from-literal=db-root-password="admin123" --dry-run=client -o yaml | kubectl apply -f -
+          kubectl apply -f k8s/db-deployment.yaml
+          kubectl apply -f k8s/backend-deployment.yaml
+          kubectl apply -f k8s/frontend-deployment.yaml
+          kubectl apply -f k8s/hpa.yaml
