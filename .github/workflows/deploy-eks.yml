@@ -1,0 +1,74 @@
+name: CI/CD Tienda Perritos EKS
+
+on:
+  push:
+    branches: [ "develop" ] # Se activa automáticamente al hacer push a develop
+
+env:
+  ECR_REGISTRY: 477810382052.dkr.ecr.us-east-1.amazonaws.com # Tu ID de cuenta AWS
+  CLUSTER_NAME: tienda-perritos-cluster
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout codigo
+      uses: actions/checkout@v3
+
+    # 1. Conectarse a AWS usando tus Secrets
+    - name: Configurar credenciales AWS
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+        aws-region: ${{ secrets.AWS_REGION }}
+
+    # 2. Iniciar sesión en Amazon ECR
+    - name: Login en Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v2
+
+    # 3. Construir y Subir las 3 imágenes Docker a AWS ECR (Construcción)
+    - name: Build & Push Base de Datos
+      run: |
+        docker build -t ${{ env.ECR_REGISTRY }}/tienda-db:latest ./db
+        docker push ${{ env.ECR_REGISTRY }}/tienda-db:latest
+
+    - name: Build & Push Backend
+      run: |
+        docker build -t ${{ env.ECR_REGISTRY }}/tienda-backend:latest ./backend
+        docker push ${{ env.ECR_REGISTRY }}/tienda-backend:latest
+
+    - name: Build & Push Frontend
+      run: |
+        docker build -t ${{ env.ECR_REGISTRY }}/tienda-frontend:latest ./frontend
+        docker push ${{ env.ECR_REGISTRY }}/tienda-frontend:latest
+
+    # 4. Conectar GitHub con tu Clúster EKS de AWS (Liberación)
+    - name: Actualizar Kubeconfig (Conectar a EKS)
+      run: |
+        aws eks update-kubeconfig --region ${{ secrets.AWS_REGION }} --name ${{ env.CLUSTER_NAME }}
+
+    # 5. Crear el espacio de trabajo en Kubernetes si no existe
+    - name: Crear Namespace
+      run: |
+        kubectl create namespace tienda-perritos --dry-run=client -o yaml | kubectl apply -f -
+
+    # 6. Crear la contraseña de la Base de datos de forma segura dentro del clúster (Rúbrica de Secrets)
+    - name: Inyectar Secrets en EKS
+      run: |
+        kubectl create secret generic tienda-secrets --namespace tienda-perritos --from-literal=db-root-password="admin123" --dry-run=client -o yaml | kubectl apply -f -
+
+    # 7. Instalar todo el código en los computadores de AWS (Despliegue)
+    - name: Desplegar Manifiestos en EKS
+      run: |
+        kubectl apply -f k8s/db-deployment.yaml
+        kubectl apply -f k8s/backend-deployment.yaml
+        kubectl apply -f k8s/frontend-deployment.yaml
+        kubectl apply -f k8s/hpa.yaml
+
+    # 8. Mostrar el estado final en la consola de GitHub
+    - name: Validar ejecucion
+      run: |
+        kubectl get pods -n tienda-perritos
