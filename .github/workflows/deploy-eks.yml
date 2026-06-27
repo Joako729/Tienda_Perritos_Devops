@@ -6,7 +6,7 @@ on:
 
 env:
   ECR_REGISTRY: 477810382052.dkr.ecr.us-east-1.amazonaws.com
-  CLUSTER_NAME: tienda-perritos-cluster
+  CLUSTER_NAME: TP-eks-cluster
 
 jobs:
   build-and-deploy:
