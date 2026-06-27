@@ -3,10 +3,10 @@ name: Deploy to Amazon EKS
 on:
   push:
     branches:
-      - deploy                  # CORREGIDO: Ahora se activa al empujar a tu rama deploy
+      - deploy                  # Se activa al empujar a tu rama deploy
   pull_request:
     branches:
-      - deploy                  # CORREGIDO: Se activa en pull requests a deploy
+      - deploy                  # Se activa en pull requests a deploy
 
 env:
   AWS_REGION: us-east-1                  # Región de AWS usada en el laboratorio
@@ -58,7 +58,7 @@ jobs:
       run: |
         aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name ${{ env.EKS_CLUSTER_NAME }}
 
-    # 6. Desplegar los manifiestos de Kubernetes (.yaml) en el clúster
+    # 6. Desplegar los manifiestos de Kubernetes (.yaml) apuntando a la carpeta correcta
     - name: Deploy Manifests to EKS Cluster
       run: |
-        kubectl apply -f k8s/kubernetes-manifests.yaml || kubectl apply -f kubernetes/ || kubectl apply -f .
+        kubectl apply -f k8s/
