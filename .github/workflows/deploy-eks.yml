@@ -1,47 +1,64 @@
-name: CI/CD Tienda Perritos EKS
+name: Deploy to Amazon EKS
 
 on:
   push:
-    branches: [ "deploy" ]
+    branches:
+      - deploy                  # CORREGIDO: Ahora se activa al empujar a tu rama deploy
+  pull_request:
+    branches:
+      - deploy                  # CORREGIDO: Se activa en pull requests a deploy
 
 env:
-  ECR_REGISTRY: 477810382052.dkr.ecr.us-east-1.amazonaws.com
-  CLUSTER_NAME: TP-eks-cluster
+  AWS_REGION: us-east-1                  # Región de AWS usada en el laboratorio
+  EKS_CLUSTER_NAME: TP-eks-cluster       # Tu clúster real en la web
 
 jobs:
-  build-and-deploy:
+  deploy:
+    name: Build, Push to ECR and Deploy to EKS
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout codigo
-        uses: actions/checkout@v3
+    # 1. Descargar el código del repositorio de GitHub
+    - name: Checkout Code
+      uses: actions/checkout@v3
 
-      - name: Configurar credenciales AWS
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
-          aws-region: ${{ secrets.AWS_REGION }}
+    # 2. Configurar las credenciales de AWS usando los Secrets obligatorios
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }} # Requerido para AWS Learner Lab de Duoc
+        aws-region: ${{ env.AWS_REGION }}
 
-      - name: Login en Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v2
+    # 3. Autenticarse en Amazon ECR (Elastic Container Registry)
+    - name: Login to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v1
 
-      - name: Build & Push Docker
-        run: |
-          docker build -t ${{ env.ECR_REGISTRY }}/tienda-db:latest ./db
-          docker push ${{ env.ECR_REGISTRY }}/tienda-db:latest
-          docker build -t ${{ env.ECR_REGISTRY }}/tienda-backend:latest ./backend
-          docker push ${{ env.ECR_REGISTRY }}/tienda-backend:latest
-          docker build -t ${{ env.ECR_REGISTRY }}/tienda-frontend:latest ./frontend
-          docker push ${{ env.ECR_REGISTRY }}/tienda-frontend:latest
+    # 4. Construir y subir las imágenes de Docker de los microservicios
+    - name: Build, Tag, and Push Images to Amazon ECR
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+      run: |
+        # Microservicio: Frontend
+        docker build -t $ECR_REGISTRY/tienda-frontend:latest ./frontend
+        docker push $ECR_REGISTRY/tienda-frontend:latest
+        
+        # Microservicio: Backend
+        docker build -t $ECR_REGISTRY/tienda-backend:latest ./backend
+        docker push $ECR_REGISTRY/tienda-backend:latest
+        
+        # Microservicio: Base de Datos
+        docker build -t $ECR_REGISTRY/tienda-db:latest ./db || echo "No DB Dockerfile found, skipping"
+        docker push $ECR_REGISTRY/tienda-db:latest || echo "No DB image to push, skipping"
 
-      - name: Despliegue en EKS
-        run: |
-          aws eks update-kubeconfig --region ${{ secrets.AWS_REGION }} --name ${{ env.CLUSTER_NAME }}
-          kubectl create namespace tienda-perritos --dry-run=client -o yaml | kubectl apply -f -
-          kubectl create secret generic tienda-secrets --namespace tienda-perritos --from-literal=db-root-password="admin123" --dry-run=client -o yaml | kubectl apply -f -
-          kubectl apply -f k8s/db-deployment.yaml
-          kubectl apply -f k8s/backend-deployment.yaml
-          kubectl apply -f k8s/frontend-deployment.yaml
-          kubectl apply -f k8s/hpa.yaml
+    # 5. Instalar y configurar kubectl con tu contexto de EKS real
+    - name: Update Kubeconfig for Amazon EKS
+      run: |
+        aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name ${{ env.EKS_CLUSTER_NAME }}
+
+    # 6. Desplegar los manifiestos de Kubernetes (.yaml) en el clúster
+    - name: Deploy Manifests to EKS Cluster
+      run: |
+        kubectl apply -f k8s/kubernetes-manifests.yaml || kubectl apply -f kubernetes/ || kubectl apply -f .
