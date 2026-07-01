@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
       - name: frontend
-        image: 477810382052.dkr.ecr.us-east-1.amazonaws.com/tienda-frontend
+        image: 604343163998.dkr.ecr.us-east-1.amazonaws.com/tienda-frontend
         ports:
         - containerPort: 80
 ---
