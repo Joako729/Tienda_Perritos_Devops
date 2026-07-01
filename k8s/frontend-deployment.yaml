@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
       - name: frontend
-        image: 604343163998.dkr.ecr.us-east-1.amazonaws.com/tienda-frontend
+        image: 604343163998.dkr.ecr.us-east-1.amazonaws.com/tienda-frontend:latest
         ports:
         - containerPort: 80
 ---
@@ -24,8 +24,11 @@ kind: Service
 metadata:
   name: frontend-service
   namespace: tienda-perritos
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing"
 spec:
   type: LoadBalancer
+  externalTrafficPolicy: Local
   selector:
     app: tienda-frontend
   ports:
