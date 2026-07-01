@@ -61,5 +61,5 @@ jobs:
     # 6. Desplegar los manifiestos de Kubernetes (.yaml) apuntando a la carpeta correcta
     - name: Deploy Manifests to EKS Cluster
       run: |
+        kubectl create namespace tienda-perritos || echo "El namespace ya existe"
         kubectl apply -f k8s/
-        kubectl create namespace tienda_perritos || echo "El namespace ya existe"
