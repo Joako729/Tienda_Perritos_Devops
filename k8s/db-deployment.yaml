@@ -15,7 +15,8 @@ spec:
     spec:
       containers:
       - name: mysql
-        image: 604343163998.dkr.ecr.us-east-1.amazonaws.com/tienda-db
+        # Usamos la imagen oficial minimalista como buena práctica
+        image: mysql:8.0
         ports:
         - containerPort: 3306
         env:

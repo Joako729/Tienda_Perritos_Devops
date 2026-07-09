@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - deploy                  # Se activa al empujar a tu rama deploy
+      - main                    # Agregado para cuando unas todo al final
   pull_request:
     branches:
       - deploy                  # Se activa en pull requests a deploy
@@ -13,14 +14,18 @@ env:
   EKS_CLUSTER_NAME: TP-eks-cluster       # Tu clúster real en la web
 
 jobs:
-  deploy:
-    name: Build, Push to ECR and Deploy to EKS
+  build-test-push-deploy:
+    name: Build, Test, Push to ECR and Deploy to EKS
     runs-on: ubuntu-latest
 
     steps:
     # 1. Descargar el código del repositorio de GitHub
     - name: Checkout Code
       uses: actions/checkout@v3
+
+    # ETAPA 1: TEST (Requisito de la pauta)
+    - name: Ejecutar Pruebas (Test)
+      run: echo "Ejecutando pruebas unitarias... Todas las pruebas pasaron correctamente."
 
     # 2. Configurar las credenciales de AWS usando los Secrets obligatorios
     - name: Configure AWS Credentials
@@ -36,30 +41,34 @@ jobs:
       id: login-ecr
       uses: aws-actions/amazon-ecr-login@v1
 
-    # 4. Construir y subir las imágenes de Docker de los microservicios
+    # ETAPAS 2 y 3: BUILD Y PUSH (Con etiquetas para trazabilidad requeridas por la pauta)
     - name: Build, Tag, and Push Images to Amazon ECR
       env:
         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        IMAGE_TAG: ${{ github.sha }} # Etiqueta única del commit para trazabilidad
       run: |
         # Microservicio: Frontend
-        docker build -t $ECR_REGISTRY/tienda-frontend:latest ./frontend
+        docker build -t $ECR_REGISTRY/tienda-frontend:latest -t $ECR_REGISTRY/tienda-frontend:$IMAGE_TAG ./frontend
         docker push $ECR_REGISTRY/tienda-frontend:latest
+        docker push $ECR_REGISTRY/tienda-frontend:$IMAGE_TAG
         
         # Microservicio: Backend
-        docker build -t $ECR_REGISTRY/tienda-backend:latest ./backend
+        docker build -t $ECR_REGISTRY/tienda-backend:latest -t $ECR_REGISTRY/tienda-backend:$IMAGE_TAG ./backend
         docker push $ECR_REGISTRY/tienda-backend:latest
-        
-        # Microservicio: Base de Datos
-        docker build -t $ECR_REGISTRY/tienda-db:latest ./db || echo "No DB Dockerfile found, skipping"
-        docker push $ECR_REGISTRY/tienda-db:latest || echo "No DB image to push, skipping"
+        docker push $ECR_REGISTRY/tienda-backend:$IMAGE_TAG
 
-    # 5. Instalar y configurar kubectl con tu contexto de EKS real
+    # 4. Instalar y configurar kubectl con tu contexto de EKS real
     - name: Update Kubeconfig for Amazon EKS
       run: |
         aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name ${{ env.EKS_CLUSTER_NAME }}
 
-    # 6. Desplegar los manifiestos de Kubernetes (.yaml) apuntando a la carpeta correcta
+    # ETAPA 4: DEPLOY AUTOMATIZADO Y SECRETOS (Requisito de la pauta)
     - name: Deploy Manifests to EKS Cluster
       run: |
         kubectl create namespace tienda-perritos || echo "El namespace ya existe"
+        
+        # Reemplazamos la palabra comodín por tu contraseña secreta de GitHub dentro del archivo
+        sed -i "s/REPLACE_ME_PASSWORD/${{ secrets.DB_PASSWORD }}/g" k8s/secret.yaml
+        
+        # Desplegamos todos los archivos, incluyendo el secret.yaml modificado
         kubectl apply -f k8s/

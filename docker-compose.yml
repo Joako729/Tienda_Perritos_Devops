@@ -1,0 +1,50 @@
+version: '3.8'
+
+services:
+ 
+  backend:
+    build: 
+      context: ./backend
+    ports:
+      - "3000:3000"
+    environment:
+      - DB_HOST=db
+      - DB_USER=root
+      - DB_PASSWORD=admin
+      - DB_NAME=tienda_perritos
+    networks:
+      - app-network
+    depends_on:
+      - db
+
+  
+  frontend:
+    build: 
+      context: ./frontend
+    ports:
+      - "8080:80"
+    networks:
+      - app-network
+    depends_on:
+      - backend
+
+  
+  db:
+    image: mysql:8.0
+    environment:
+      - MYSQL_ROOT_PASSWORD=admin
+      - MYSQL_DATABASE=tienda_perritos
+    ports:
+      - "3306:3306"
+    networks:
+      - app-network
+    volumes:
+      - db-data:/var/lib/mysql
+
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  db-data:
