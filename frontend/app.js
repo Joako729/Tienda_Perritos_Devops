@@ -1,8 +1,8 @@
 /**
  * Frontend simple para CRUD de productos de la tienda de perritos.
  */
-// URL base de la API apuntando al balanceador de carga público de tu backend en AWS EKS
-const API_BASE = "http://ad67850fc94354ff3a35df866fa37c73-470753863.us-east-1.elb.amazonaws.com:3000/api/productos";
+// URL base de la API apuntando al balanceador de carga público de tu backend en AWS EKS (Puerto 80)
+const API_BASE = "http://ad67850fc94354ff3a35df866fa37c73-470753863.us-east-1.elb.amazonaws.com/api/productos";
 
 let editandoId = null;
 const tbody = document.getElementById("tbodyProductos");
