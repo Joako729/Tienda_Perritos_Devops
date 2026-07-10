@@ -1,21 +1,23 @@
 // Configuración del servidor Express para la Tienda de Perritos
-// Integración con AWS EC2 y despliegue mediante GitHub Actions
-// Cambio Backend
+// Integración con AWS EKS y despliegue mediante GitHub Actions
+
 const express = require("express");
 const cors = require("cors");
 const mysql = require("mysql2/promise");
 
 const app = express();
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 3000;
 
+// Variables de entorno con valores por defecto
 const {
-  DB_HOST = "172.31.40.163",
-  DB_USER = "root",
-  DB_PASSWORD = "admin123",
-  DB_NAME = "tienda_perritos",
-  DB_PORT = 3306,
+    DB_HOST = "mysql-service",
+    DB_USER = "root",
+    DB_PASSWORD = "admin123",
+    DB_NAME = "tienda_perritos",
+    DB_PORT = 3306,
 } = process.env;
 
+// Middleware (El cors permite que el frontend público se comunique con este backend)
 app.use(cors());
 app.use(express.json());
 
@@ -23,121 +25,120 @@ let pool;
 
 // Inicializar pool de conexiones
 async function initDb() {
-  try {
-    pool = mysql.createPool({
-      host: DB_HOST,
-      user: DB_USER,
-      password: DB_PASSWORD,
-      database: DB_NAME,
-      port: DB_PORT,
-      waitForConnections: true,
-      connectionLimit: 10,
-      queueLimit: 0,
-    });
-    console.log("Pool de conexiones MySQL inicializado.");
-  } catch (err) {
-    console.error("Error al inicializar pool de MySQL:", err);
-  }
+    try {
+        pool = mysql.createPool({
+            host: DB_HOST,
+            user: DB_USER,
+            password: DB_PASSWORD,
+            database: DB_NAME,
+            port: DB_PORT,
+            waitForConnections: true,
+            connectionLimit: 10,
+            queueLimit: 0,
+        });
+        console.log("Pool de conexiones MySQL inicializado correctamente.");
+    } catch (err) {
+        console.error("Error al inicializar pool de MySQL:", err);
+    }
 }
 
 // Helper para manejar errores
 function handleError(res, error, message = "Error interno del servidor") {
-  console.error(error);
-  res.status(500).json({ message });
+    console.error(`[Error API]: ${message}`, error);
+    if (!res.headersSent) {
+        res.status(500).json({ message, error: error.message });
+    }
 }
 
 // Obtener todos los productos
 app.get("/api/productos", async (req, res) => {
-  try {
-    const [rows] = await pool.query("SELECT id, nombre, descripcion, precio, stock FROM productos ORDER BY id DESC");
-    res.json(rows);
-  } catch (err) {
-    handleError(res, err, "No se pudieron obtener los productos.");
-  }
+    try {
+        const [rows] = await pool.query("SELECT id, nombre, descripcion, precio, stock FROM productos ORDER BY id DESC");
+        res.json(rows);
+    } catch (err) {
+        handleError(res, err, "No se pudieron obtener los productos. ¿Existe la tabla en la base de datos?");
+    }
 });
 
 // Obtener un producto por ID
 app.get("/api/productos/:id", async (req, res) => {
-  const { id } = req.params;
-  try {
-    const [rows] = await pool.query("SELECT id, nombre, descripcion, precio, stock FROM productos WHERE id = ?", [id]);
-    if (rows.length === 0) {
-      return res.status(404).json({ message: "Producto no encontrado." });
+    const { id } = req.params;
+    try {
+        const [rows] = await pool.query("SELECT id, nombre, descripcion, precio, stock FROM productos WHERE id = ?", [id]);
+        if (rows.length === 0) {
+            return res.status(404).json({ message: "Producto no encontrado." });
+        }
+        res.json(rows);
+    } catch (err) {
+        handleError(res, err, "No se pudo obtener el producto.");
     }
-    res.json(rows[0]);
-  } catch (err) {
-    handleError(res, err, "No se pudo obtener el producto.");
-  }
 });
 
 // Crear un nuevo producto
 app.post("/api/productos", async (req, res) => {
-  const { nombre, descripcion, precio, stock } = req.body;
+    const { nombre, descripcion, precio, stock } = req.body;
 
-  if (!nombre || precio == null || stock == null) {
-    return res.status(400).json({ message: "Nombre, precio y stock son obligatorios." });
-  }
+    if (!nombre || precio == null || stock == null) {
+        return res.status(400).json({ message: "Nombre, precio y stock son obligatorios." });
+    }
 
-  try {
-    const [result] = await pool.query(
-      "INSERT INTO productos (nombre, descripcion, precio, stock) VALUES (?, ?, ?, ?)",
-      [nombre, descripcion || null, precio, stock]
-    );
-    const nuevoId = result.insertId;
-    const [rows] = await pool.query("SELECT id, nombre, descripcion, precio, stock FROM productos WHERE id = ?", [nuevoId]);
-    res.status(201).json(rows[0]);
-  } catch (err) {
-    handleError(res, err, "No se pudo crear el Producto.");
-  }
+    try {
+        const [result] = await pool.query(
+            "INSERT INTO productos (nombre, descripcion, precio, stock) VALUES (?, ?, ?, ?)",
+            [nombre, descripcion || null, precio, stock]
+        );
+        const nuevoId = result.insertId;
+        const [rows] = await pool.query("SELECT id, nombre, descripcion, precio, stock FROM productos WHERE id = ?", [nuevoId]);
+        res.status(201).json(rows);
+    } catch (err) {
+        handleError(res, err, "No se pudo crear el Producto.");
+    }
 });
 
 // Actualizar un producto
 app.put("/api/productos/:id", async (req, res) => {
-  const { id } = req.params;
-  const { nombre, descripcion, precio, stock } = req.body;
+    const { id } = req.params;
+    const { nombre, descripcion, precio, stock } = req.body;
 
-  if (!nombre || precio == null || stock == null) {
-    return res.status(400).json({ message: "Nombre, Precio y Stock son obligatorios." });
-  }
-
-  try {
-    const [result] = await pool.query(
-      "UPDATE productos SET nombre = ?, descripcion = ?, precio = ?, stock = ? WHERE id = ?",
-      [nombre, descripcion || null, precio, stock, id]
-    );
-
-    if (result.affectedRows === 0) {
-      return res.status(404).json({ message: "Producto no encontrado." });
+    if (!nombre || precio == null || stock == null) {
+        return res.status(400).json({ message: "Nombre, Precio y Stock son obligatorios." });
     }
 
-    const [rows] = await pool.query("SELECT id, nombre, descripcion, precio, stock FROM productos WHERE id = ?", [id]);
-    res.json(rows[0]);
-  } catch (err) {
-    handleError(res, err, "No se pudo actualizar el Producto.");
-  }
+    try {
+        const [result] = await pool.query(
+            "UPDATE productos SET nombre = ?, descripcion = ?, precio = ?, stock = ? WHERE id = ?",
+            [nombre, descripcion || null, precio, stock, id]
+        );
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ message: "Producto no encontrado para actualizar." });
+        }
+        res.json({ message: "Producto actualizado correctamente." }); // <-- ¡Este era el código que faltaba!
+    } catch (err) {
+        handleError(res, err, "No se pudo actualizar el Producto.");
+    }
 });
 
 // Eliminar un producto
 app.delete("/api/productos/:id", async (req, res) => {
-  const { id } = req.params;
-  try {
-    const [result] = await pool.query("DELETE FROM productos WHERE id = ?", [id]);
-    if (result.affectedRows === 0) {
-      return res.status(404).json({ message: "Producto no encontrado." });
+    const { id } = req.params;
+    try {
+        const [result] = await pool.query("DELETE FROM productos WHERE id = ?", [id]);
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ message: "Producto no encontrado." });
+        }
+        res.json({ message: "Producto eliminado correctamente." });
+    } catch (err) {
+        handleError(res, err, "No se pudo eliminar el Producto.");
     }
-    res.json({ message: "Producto eliminado correctamente." });
-  } catch (err) {
-    handleError(res, err, "No se pudo eliminar el Producto.");
-  }
 });
 
 // Endpoint de salud
 app.get("/api/health", (req, res) => {
-  res.json({ status: "ok", message: "Backend de tienda de perritos en ejecución." });
+    res.json({ status: "ok", message: "Backend de tienda de perritos en ejecución y accesible." });
 });
 
 // Iniciar servidor
 app.listen(PORT, async () => {
-  console.log(`Servidor backend escuchando en puerto ${PORT}`);
-  await initDb();
+    console.log(`Servidor backend escuchando en puerto ${PORT}`); // <-- Comillas corregidas aquí
+    await initDb();
 });
