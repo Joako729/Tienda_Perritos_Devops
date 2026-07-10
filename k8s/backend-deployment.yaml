@@ -15,10 +15,9 @@ spec:
     spec:
       containers:
       - name: backend
-        image: 604343163998.dkr.ecr.us-east-1.amazonaws.com/tienda-backend:latest
+        image: 901485029489.dkr.ecr.us-east-1.amazonaws.com/tienda-backend
         ports:
-        - containerPort: 3000 # Cambiado a 3000 para que coincida con el Dockerfile
-        # Se agregan recursos obligatorios para que el HPA pueda funcionar y evaluar la CPU
+        - containerPort: 3000 
         resources:
           requests:
             cpu: "100m"
