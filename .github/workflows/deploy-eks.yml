@@ -58,6 +58,10 @@ jobs:
       run: |
         kubectl create namespace tienda-perritos || echo "El namespace ya existe"
         sed -i "s/REPLACE_ME_PASSWORD/${{ secrets.DB_PASSWORD }}/g" k8s/secret.yaml
+        
+        # 👇 ESTO SOLUCIONA EL ERROR: CREA EL CONFIGMAP DIRECTAMENTE DESDE GITHUB
+        kubectl create configmap mysql-init --from-file=db/init.sql -n tienda-perritos --dry-run=client -o yaml | kubectl apply -f -
+        
         kubectl apply -f k8s/
         kubectl rollout restart deployment backend -n tienda-perritos
         kubectl rollout restart deployment frontend -n tienda-perritos
