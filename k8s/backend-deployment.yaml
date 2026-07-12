@@ -1,23 +1,23 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: tienda-backend
+  name: backend
   namespace: tienda-perritos
 spec:
   replicas: 2
   selector:
     matchLabels:
-      app: tienda-backend
+      app: backend
   template:
     metadata:
       labels:
-        app: tienda-backend
+        app: backend
     spec:
       containers:
       - name: backend
-        image: 901485029489.dkr.ecr.us-east-1.amazonaws.com/tienda-backend
+        image: 901485029489.dkr.ecr.us-east-1.amazonaws.com/tienda-backend:latest
         ports:
-        - containerPort: 3000 
+        - containerPort: 3001 
         resources:
           requests:
             cpu: "100m"
@@ -27,18 +27,22 @@ spec:
             memory: "256Mi"
         env:
         - name: DB_HOST
-          value: "mysql-service" 
+          value: "db-service" 
         - name: DB_USER
-          value: "root"
+          valueFrom:
+            secretKeyRef:
+              name: mysql-secret
+              key: DB_USER
         - name: DB_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: tienda-secrets
-              key: db-root-password
-        - name: DB_NAME
-          value: "tienda_perritos"
-        - name: PORT
-          value: "3000"
+              name: mysql-secret
+              key: DB_PASSWORD
+        - name: DB_DATABASE
+          valueFrom:
+            secretKeyRef:
+              name: mysql-secret
+              key: DB_DATABASE
 ---
 apiVersion: v1
 kind: Service
@@ -46,10 +50,10 @@ metadata:
   name: backend-service
   namespace: tienda-perritos
 spec:
-  type: LoadBalancer 
+  type: ClusterIP
   selector:
-    app: tienda-backend
+    app: backend
   ports:
     - protocol: TCP
-      port: 3000
-      targetPort: 3000
+      port: 3001
+      targetPort: 3001

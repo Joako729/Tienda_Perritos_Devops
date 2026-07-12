@@ -3,15 +3,15 @@ name: Deploy to Amazon EKS
 on:
   push:
     branches:
-      - deploy                  # Se activa al empujar a tu rama deploy
-      - main                    # Agregado para cuando unas todo al final
+      - deploy
+      - main
   pull_request:
     branches:
-      - deploy                  # Se activa en pull requests a deploy
+      - deploy
 
 env:
-  AWS_REGION: us-east-1                  # Región de AWS usada en el laboratorio
-  EKS_CLUSTER_NAME: TP-eks-cluster       # Tu clúster real en la web
+  AWS_REGION: us-east-1
+  EKS_CLUSTER_NAME: TP-eks-cluster
 
 jobs:
   build-test-push-deploy:
@@ -19,56 +19,45 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    # 1. Descargar el código del repositorio de GitHub
     - name: Checkout Code
       uses: actions/checkout@v3
 
-    # ETAPA 1: TEST (Requisito de la pauta)
     - name: Ejecutar Pruebas (Test)
       run: echo "Ejecutando pruebas unitarias... Todas las pruebas pasaron correctamente."
 
-    # 2. Configurar las credenciales de AWS usando los Secrets obligatorios
     - name: Configure AWS Credentials
       uses: aws-actions/configure-aws-credentials@v2
       with:
         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }} # Requerido para AWS Learner Lab de Duoc
+        aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
         aws-region: ${{ env.AWS_REGION }}
 
-    # 3. Autenticarse en Amazon ECR (Elastic Container Registry)
     - name: Login to Amazon ECR
       id: login-ecr
       uses: aws-actions/amazon-ecr-login@v1
 
-    # ETAPAS 2 y 3: BUILD Y PUSH (Con etiquetas para trazabilidad requeridas por la pauta)
     - name: Build, Tag, and Push Images to Amazon ECR
       env:
         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-        IMAGE_TAG: ${{ github.sha }} # Etiqueta única del commit para trazabilidad
+        IMAGE_TAG: ${{ github.sha }}
       run: |
-        # Microservicio: Frontend
         docker build -t $ECR_REGISTRY/tienda-frontend:latest -t $ECR_REGISTRY/tienda-frontend:$IMAGE_TAG ./frontend
         docker push $ECR_REGISTRY/tienda-frontend:latest
         docker push $ECR_REGISTRY/tienda-frontend:$IMAGE_TAG
         
-        # Microservicio: Backend
         docker build -t $ECR_REGISTRY/tienda-backend:latest -t $ECR_REGISTRY/tienda-backend:$IMAGE_TAG ./backend
         docker push $ECR_REGISTRY/tienda-backend:latest
         docker push $ECR_REGISTRY/tienda-backend:$IMAGE_TAG
 
-    # 4. Instalar y configurar kubectl con tu contexto de EKS real
     - name: Update Kubeconfig for Amazon EKS
       run: |
         aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name ${{ env.EKS_CLUSTER_NAME }}
 
-    # ETAPA 4: DEPLOY AUTOMATIZADO Y SECRETOS (Requisito de la pauta)
     - name: Deploy Manifests to EKS Cluster
       run: |
         kubectl create namespace tienda-perritos || echo "El namespace ya existe"
-        
-        # Reemplazamos la palabra comodín por tu contraseña secreta de GitHub dentro del archivo
         sed -i "s/REPLACE_ME_PASSWORD/${{ secrets.DB_PASSWORD }}/g" k8s/secret.yaml
-        
-        # Desplegamos todos los archivos, incluyendo el secret.yaml modificado
         kubectl apply -f k8s/
+        kubectl rollout restart deployment backend -n tienda-perritos
+        kubectl rollout restart deployment frontend -n tienda-perritos

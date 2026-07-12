@@ -1,14 +1,19 @@
-FROM node:18-alpine AS builder
-WORKDIR /app
-COPY package*.json ./
-RUN npm install --omit=dev
 
 FROM node:18-alpine
+
 WORKDIR /app
-COPY --from=builder /app/node_modules ./node_modules
+
+COPY package*.json ./
+
+RUN npm install --production
+
 COPY . .
 
-ENV PORT=3000
-EXPOSE 3000
+EXPOSE 3001
 
-CMD ["node", "server.js"] 
+RUN addgroup appgroup && adduser -S appuser -G appgroup
+
+USER appuser
+
+CMD ["npm", "start"]
+

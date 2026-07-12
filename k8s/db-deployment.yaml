@@ -1,21 +1,20 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: tienda-db
+  name: db
   namespace: tienda-perritos
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: tienda-db
+      app: db
   template:
     metadata:
       labels:
-        app: tienda-db
+        app: db
     spec:
       containers:
       - name: mysql
-        # Usamos la imagen oficial minimalista como buena práctica
         image: mysql:8.0
         ports:
         - containerPort: 3306
@@ -23,19 +22,27 @@ spec:
         - name: MYSQL_ROOT_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: tienda-secrets
-              key: db-root-password
+              name: mysql-secret
+              key: DB_PASSWORD
         - name: MYSQL_DATABASE
           value: "tienda_perritos"
+        volumeMounts:
+        - name: init-script
+          mountPath: /docker-entrypoint-initdb.d/
+      volumes:
+      - name: init-script
+        configMap:
+          name: mysql-init
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: mysql-service
+  name: db-service
   namespace: tienda-perritos
 spec:
+  type: ClusterIP
   selector:
-    app: tienda-db
+    app: db
   ports:
     - protocol: TCP
       port: 3306

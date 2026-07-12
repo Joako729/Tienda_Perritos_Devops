@@ -1,17 +1,17 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: tienda-frontend
+  name: frontend
   namespace: tienda-perritos
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
-      app: tienda-frontend
+      app: frontend
   template:
     metadata:
       labels:
-        app: tienda-frontend
+        app: frontend
     spec:
       containers:
       - name: frontend
@@ -30,7 +30,7 @@ spec:
   type: LoadBalancer
   externalTrafficPolicy: Local
   selector:
-    app: tienda-frontend
+    app: frontend
   ports:
     - protocol: TCP
       port: 80
